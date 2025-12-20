@@ -1,0 +1,76 @@
+#include <Servo.h>
+
+// ---------- PINOS DOS SERVOS ----------
+const uint8_t ServoLeftLegPin  = 2;
+const uint8_t ServoRightLegPin = 3;
+const uint8_t ServoLeftFootPin = 4;
+const uint8_t ServoRightFootPin = 5;
+
+// ---------- OBJETOS SERVO ----------
+Servo LeftLeg;
+Servo RightLeg;
+Servo LeftFoot;
+Servo RightFoot;
+
+// ---------- POSIÇÕES ----------
+int LA0 = 60;    // perna esquerda neutra
+int RA0 = 120;   // perna direita neutra
+
+int LATL = LA0 + 40;  // inclina para esquerda
+int RATL = RA0 + 40;
+
+int LATR = LA0 - 40;  // inclina para direita
+int RATR = RA0 - 40;
+
+int STEP = 20; // avanço do pé
+
+// ---------- FUNÇÃO: POSIÇÃO INICIAL ----------
+void HomePosition() {
+  LeftLeg.attach(ServoLeftLegPin);
+  RightLeg.attach(ServoRightLegPin);
+  LeftFoot.attach(ServoLeftFootPin);
+  RightFoot.attach(ServoRightFootPin);
+
+  LeftLeg.write(LA0);
+  RightLeg.write(RA0);
+  LeftFoot.write(90);
+  RightFoot.write(90);
+
+  delay(500);
+}
+
+// ---------- FUNÇÃO: ANDAR PARA FRENTE ----------
+void WalkForward() {
+
+  // Inclina para direita
+  LeftLeg.write(LATR);
+  RightLeg.write(RATR);
+  delay(300);
+
+  // Pé direito avança
+  RightFoot.write(90 - STEP);
+  delay(300);
+  RightFoot.write(90);
+  delay(100);
+
+  // Inclina para esquerda
+  LeftLeg.write(LATL);
+  RightLeg.write(RATL);
+  delay(300);
+
+  // Pé esquerdo avança
+  LeftFoot.write(90 + STEP);
+  delay(300);
+  LeftFoot.write(90);
+  delay(100);
+}
+
+// ---------- SETUP ----------
+void setup() {
+  HomePosition();
+}
+
+// ---------- LOOP ----------
+void loop() {
+  WalkForward();
+}
