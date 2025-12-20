@@ -1,0 +1,32 @@
+#include <Servo.h>
+
+// Pinos dos braços
+const uint8_t ServoLeftArmPin  = 6;
+const uint8_t ServoRightArmPin = 7;
+
+// Objetos servo
+Servo myservoLeftArm;
+Servo myservoRightArm;
+
+void setup() {
+  // Anexa os servos
+  myservoLeftArm.attach(ServoLeftArmPin, 544, 2400);
+  myservoRightArm.attach(ServoRightArmPin, 544, 2400);
+
+  // Posição inicial (meio)
+  myservoLeftArm.write(90);
+  myservoRightArm.write(90);
+  delay(1000);
+}
+
+void loop() {
+  // Braços para cima
+  myservoLeftArm.write(180);
+  myservoRightArm.write(0);
+  delay(1000);
+
+  // Braços para baixo
+  myservoLeftArm.write(0);
+  myservoRightArm.write(180);
+  delay(1000);
+}
