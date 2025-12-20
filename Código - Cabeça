@@ -1,0 +1,31 @@
+#include <Servo.h>
+
+const uint8_t ServoHeadPin = 10; // pino da cabeça (TX no Nano)
+
+Servo myservoHead;
+
+void setup() {
+  myservoHead.attach(ServoHeadPin, 544, 2400);
+
+  // posição inicial (centro)
+  myservoHead.write(90);
+  delay(1000);
+}
+
+void loop() {
+  // gira para um lado
+  myservoHead.write(60);
+  delay(1000);
+
+  // volta para o centro
+  myservoHead.write(90);
+  delay(1000);
+
+  // gira para o outro lado
+  myservoHead.write(120);
+  delay(1000);
+
+  // volta para o centro
+  myservoHead.write(90);
+  delay(1000);
+}
