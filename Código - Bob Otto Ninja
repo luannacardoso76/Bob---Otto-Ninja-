@@ -1,0 +1,388 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Servo.h>
+
+// ===== DEFINIÇÕES DE PINOS =====
+#define TRIG_PIN 8
+#define ECHO_PIN 9
+#define BUZZER_PIN 13
+#define OLED_RESET -1
+
+// Pinos dos servos
+const uint8_t ServoLeftLegPin = 2;
+const uint8_t ServoRightLegPin = 3;
+const uint8_t ServoLeftFootPin = 4;
+const uint8_t ServoRightFootPin = 5;
+const uint8_t ServoLeftArmPin = 6;
+const uint8_t ServoRightArmPin = 7;
+const uint8_t ServoHeadPin = 10;
+
+// ===== DISPLAY OLED =====
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_ADDRESS 0x3D
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// ===== OBJETOS SERVO =====
+Servo leftLeg, rightLeg, leftFoot, rightFoot, leftArm, rightArm, head;
+
+// ===== VARIÁVEIS GLOBAIS =====
+float distancia;
+bool displayOK = false;
+int passoAtual = 0;
+
+// ===== POSIÇÕES =====
+int LA0 = 60, RA0 = 120;
+int LATL = LA0 + 40, RATL = RA0 + 40;
+int LATR = LA0 - 40, RATR = RA0 - 40;
+int STEP = 20;
+
+// =================================================
+// FUNÇÃO: INICIALIZAR DISPLAY
+// =================================================
+bool initDisplay() {
+  Wire.begin();
+  delay(100);
+  
+  if (display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
+    displayOK = true;
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    Serial.println("Display OK");
+    return true;
+  }
+  Serial.println("Display falhou");
+  return false;
+}
+
+// =================================================
+// FUNÇÃO: ESCREVER NO DISPLAY
+// =================================================
+void escreverDisplay(const char* texto, byte tamanho = 2) {
+  if (!displayOK) return;
+  
+  display.clearDisplay();
+  display.setTextSize(tamanho);
+  display.setCursor(0, 0);
+  display.println(texto);
+  display.display();
+}
+
+// =================================================
+// FUNÇÃO: MEDIR DISTÂNCIA
+// =================================================
+float medirDistancia() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  
+  long duracao = pulseIn(ECHO_PIN, HIGH, 30000);
+  if (duracao == 0) return 400.0; // Retorna valor alto se erro
+  
+  return duracao * 0.034 / 2;
+}
+
+// =================================================
+// FUNÇÃO: EXIBIR DISTÂNCIA NO DISPLAY
+// =================================================
+void exibirDistancia(float dist) {
+  if (!displayOK) return;
+  
+  display.setTextSize(1);
+  display.setCursor(0, 50);
+  display.print("Dist: ");
+  display.print(dist);
+  display.print(" cm");
+  display.display();
+}
+
+// =================================================
+// FUNÇÃO: VERIFICAR E DESVIAR OBSTÁCULO
+// =================================================
+void verificarObstaculo() {
+  distancia = medirDistancia();
+  exibirDistancia(distancia);
+  
+  if (distancia < 20 && distancia > 2) {
+    escreverDisplay("DESVIANDO!", 1);
+    
+    // Desvio: recua e vira
+    leftFoot.attach(ServoLeftFootPin);
+    rightFoot.attach(ServoRightFootPin);
+    
+    // Recua
+    leftFoot.write(90 - 30);
+    rightFoot.write(90 + 30);
+    delay(800);
+    leftFoot.write(90);
+    rightFoot.write(90);
+    
+    // Vira
+    leftFoot.write(90 + 40);
+    rightFoot.write(90 + 40);
+    delay(600);
+    leftFoot.write(90);
+    rightFoot.write(90);
+    
+    leftFoot.detach();
+    rightFoot.detach();
+    
+    delay(500);
+  }
+}
+
+// =================================================
+// FUNÇÃO: ANDAR (COM VERIFICAÇÃO DE OBSTÁCULO)
+// =================================================
+void andar(int passos) {
+  leftLeg.attach(ServoLeftLegPin);
+  rightLeg.attach(ServoRightLegPin);
+  leftFoot.attach(ServoLeftFootPin);
+  rightFoot.attach(ServoRightFootPin);
+  
+  for(int i = 0; i < passos; i++) {
+    // Verifica obstáculo a cada passo
+    verificarObstaculo();
+    
+    // Passo direito
+    leftLeg.write(LATR);
+    rightLeg.write(RATR);
+    delay(300);
+    rightFoot.write(90 - STEP);
+    delay(300);
+    rightFoot.write(90);
+    delay(100);
+    
+    // Verifica novamente
+    verificarObstaculo();
+    
+    // Passo esquerdo
+    leftLeg.write(LATL);
+    rightLeg.write(RATL);
+    delay(300);
+    leftFoot.write(90 + STEP);
+    delay(300);
+    leftFoot.write(90);
+    delay(100);
+  }
+  
+  leftLeg.detach();
+  rightLeg.detach();
+  leftFoot.detach();
+  rightFoot.detach();
+}
+
+// =================================================
+// FUNÇÃO: MEXER BRAÇOS
+// =================================================
+void mexerBracos() {
+  leftArm.attach(ServoLeftArmPin);
+  rightArm.attach(ServoRightArmPin);
+  
+  // Sobe braços
+  leftArm.write(180);
+  rightArm.write(0);
+  delay(1000);
+  
+  // Desce braços
+  leftArm.write(0);
+  rightArm.write(180);
+  delay(1000);
+  
+  // Centro
+  leftArm.write(90);
+  rightArm.write(90);
+  delay(500);
+  
+  leftArm.detach();
+  rightArm.detach();
+}
+
+// =================================================
+// FUNÇÃO: ACENAR COM UM BRAÇO
+// =================================================
+void acenar() {
+  rightArm.attach(ServoRightArmPin);
+  
+  for(int i = 0; i < 3; i++) {
+    rightArm.write(30);
+    delay(300);
+    rightArm.write(150);
+    delay(300);
+  }
+  
+  rightArm.write(90);
+  delay(500);
+  rightArm.detach();
+}
+
+// =================================================
+// FUNÇÃO: MEXER CABEÇA
+// =================================================
+void mexerCabeca() {
+  head.attach(ServoHeadPin);
+  
+  head.write(60);
+  delay(800);
+  head.write(90);
+  delay(800);
+  head.write(120);
+  delay(800);
+  head.write(90);
+  delay(800);
+  
+  head.detach();
+}
+
+// =================================================
+// FUNÇÃO: MODO NINJA E ROLAR
+// =================================================
+void modoNinjaRolar() {
+  // Posição ninja
+  leftArm.attach(ServoLeftArmPin);
+  rightArm.attach(ServoRightArmPin);
+  leftLeg.attach(ServoLeftLegPin);
+  rightLeg.attach(ServoRightLegPin);
+  
+  leftArm.write(180);
+  rightArm.write(0);
+  leftLeg.write(180);
+  rightLeg.write(0);
+  delay(1000);
+  
+  leftArm.detach();
+  rightArm.detach();
+  leftLeg.detach();
+  rightLeg.detach();
+  
+  // Rolar
+  escreverDisplay("ROLANDO!");
+  leftFoot.attach(ServoLeftFootPin);
+  rightFoot.attach(ServoRightFootPin);
+  
+  leftFoot.write(90 + 40);
+  rightFoot.write(90 - 40);
+  
+  // Rola por 3 segundos com verificação de obstáculo
+  for(int i = 0; i < 6; i++) {
+    verificarObstaculo();
+    delay(500);
+  }
+  
+  leftFoot.write(90);
+  rightFoot.write(90);
+  delay(200);
+  
+  leftFoot.detach();
+  rightFoot.detach();
+}
+
+// =================================================
+// SETUP (EXECUTA TUDO UMA VEZ)
+// =================================================
+void setup() {
+  Serial.begin(9600);
+  
+  // Configura pinos
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(TRIG_PIN, LOW);
+  
+  // Inicializa display
+  initDisplay();
+  
+  // Sinal de início
+  tone(BUZZER_PIN, 2000, 200);
+  delay(300);
+  
+  // ===== SEQUÊNCIA PRINCIPAL =====
+  
+  // 1. ANDAR
+  escreverDisplay("ANDANDO");
+  passoAtual = 1;
+  andar(4);
+  delay(1000);
+  
+  // 2. MEXER BRAÇOS
+  escreverDisplay("BRAÇOS");
+  passoAtual = 2;
+  mexerBracos();
+  delay(1000);
+  
+  // 3. CANTAR JINGLE BELLS + FELIZ NATAL
+  escreverDisplay("Feliz Natal!");
+  passoAtual = 3;
+    delay(1000);
+  
+  // 4. MEXER CABEÇA
+  escreverDisplay("CABECA");
+  passoAtual = 4;
+  mexerCabeca();
+  delay(1000);
+  
+  // 5. MODO NINJA
+  escreverDisplay("MODO NINJA");
+  passoAtual = 5;
+  
+  // 7. ROLAR
+  modoNinjaRolar();
+  delay(1000);
+  
+  // 8. MEXER BRAÇOS NOVAMENTE
+  escreverDisplay("BRAÇOS 2");
+  passoAtual = 8;
+  mexerBracos();
+  delay(1000);
+  
+  // 9. ANDAR NOVAMENTE
+  escreverDisplay("ANDANDO 2");
+  passoAtual = 9;
+  andar(3);
+  delay(1000);
+  
+  // 10. CANTAR STAR WARS + TCHAU UNEB
+  escreverDisplay("Tchau Uneb");
+  passoAtual = 10;
+  delay(1000);
+  
+  // 11. ACENAR COM UM BRAÇO
+  escreverDisplay("ACENANDO");
+  passoAtual = 11;
+  acenar();
+  delay(1000);
+  
+  // FIM DA SEQUÊNCIA
+  escreverDisplay("FIM");
+  passoAtual = 12;
+  
+  // Sinal de término
+  for(int i = 0; i < 3; i++) {
+    tone(BUZZER_PIN, 1500, 100);
+    delay(200);
+  }
+  
+  // Mantém display ligado com mensagem final
+  escreverDisplay("COMPLETO!");
+}
+
+// =================================================
+// LOOP (VAZIO - SÓ EXECUTA UMA VEZ)
+// =================================================
+void loop() {
+  // Não faz nada - execução única
+  // Apenas mantém a última mensagem no display
+  
+  // Opcional: continua monitorando distância
+  static unsigned long ultimaVerificacao = 0;
+  if (millis() - ultimaVerificacao > 1000) {
+    distancia = medirDistancia();
+    exibirDistancia(distancia);
+    ultimaVerificacao = millis();
+  }
+  
+  delay(100);
+}
